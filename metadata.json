@@ -1,0 +1,5 @@
+{
+  "name": "AI Image Captioner",
+  "description": "Upload an image and get an AI-generated caption using the power of Gemini. This app combines computer vision and natural language processing to describe your images in a snap.",
+  "requestFramePermissions": []
+}
