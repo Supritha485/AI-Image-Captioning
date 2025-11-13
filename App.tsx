@@ -124,14 +124,14 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelect, onClearIma
         if (!previewUrl) return;
         e.preventDefault();
         const newScale = scale - e.deltaY * 0.005;
-        setScale(Math.min(Math.max(newScale, 0.5), 5)));
+        setScale(Math.min(Math.max(newScale, 0.5), 5));
     };
     
     const handleZoom = (e: React.MouseEvent<HTMLButtonElement>, direction: 'in' | 'out') => {
         e.preventDefault();
         e.stopPropagation();
         const newScale = direction === 'in' ? scale * 1.2 : scale / 1.2;
-        setScale(Math.min(Math.max(newScale, 0.5), 5)));
+        setScale(Math.min(Math.max(newScale, 0.5), 5));
     };
 
     const handleResetClick = (e: React.MouseEvent<HTMLButtonElement>) => {
