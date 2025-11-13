@@ -1,37 +1,24 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { generateCaptionStream, analyzeError } from './services/geminiService';
+import { 
+    generateFastCaptionStream, 
+    generateFactualCaption,
+    generateDeepCaptionStream,
+    generateSpeech,
+    analyzeError 
+} from './services/geminiService';
+import { decode, decodeAudioData } from './audioHelpers';
 
-const UploadIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-    </svg>
-);
+// --- ICONS ---
+const UploadIcon = () => (<svg xmlns="http://www.w.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>);
+const CloseIcon = () => (<svg xmlns="http://www.w.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>);
+const ZoomInIcon = () => (<svg xmlns="http://www.w.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>);
+const ZoomOutIcon = () => (<svg xmlns="http://www.w.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" /></svg>);
+const ResetIcon = () => (<svg xmlns="http://www.w.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 4l16 16" /></svg>);
+const PlayIcon = () => <svg xmlns="http://www.w.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+const LoadingAudioSpinner = () => <div className="w-6 h-6 border-2 border-gray-300 border-t-primary rounded-full animate-spin"></div>;
 
-const CloseIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-    </svg>
-);
-
-const ZoomInIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-    </svg>
-);
-
-const ZoomOutIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
-    </svg>
-);
-
-const ResetIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 4l16 16" />
-    </svg>
-);
-
+// --- CHILD COMPONENTS ---
 
 const LoadingSpinner = () => (
     <div className="flex items-center justify-center space-x-2">
@@ -41,14 +28,8 @@ const LoadingSpinner = () => (
     </div>
 );
 
-interface ImageUploaderProps {
-    onImageSelect: (file: File) => void;
-    onClearImage: () => void;
-    previewUrl: string | null;
-    isLoading: boolean;
-}
-
-const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelect, onClearImage, previewUrl, isLoading }) => {
+const ImageUploader = ({ onImageSelect, onClearImage, previewUrl, isLoading }) => {
+    // ... (This component remains unchanged from the previous version)
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [scale, setScale] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -205,6 +186,33 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ onImageSelect, onClearIma
     );
 };
 
+const ModeSelector = ({ selectedMode, onModeChange, disabled }) => {
+    const modes = [
+        { id: 'fast', title: 'Creative Caption' },
+        { id: 'factual', title: 'Factual Caption' },
+        { id: 'deep', title: 'Deeper Analysis' }
+    ];
+
+    return (
+        <div className="flex justify-center flex-wrap gap-2 p-1 bg-pink-100 rounded-xl">
+            {modes.map(mode => (
+                <button
+                    key={mode.id}
+                    onClick={() => onModeChange(mode.id)}
+                    disabled={disabled}
+                    className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary
+                        ${selectedMode === mode.id ? 'bg-primary text-white shadow' : 'text-primary hover:bg-pink-200'}
+                        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                    {mode.title}
+                </button>
+            ))}
+        </div>
+    );
+};
+
+// --- MAIN APP COMPONENT ---
+type GenerationMode = 'fast' | 'factual' | 'deep';
 
 const App: React.FC = () => {
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -213,25 +221,30 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isStreaming, setIsStreaming] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [generationMode, setGenerationMode] = useState<GenerationMode>('fast');
+    const [groundingChunks, setGroundingChunks] = useState<any[]>([]);
+    const [isAudioLoading, setIsAudioLoading] = useState<boolean>(false);
+
+    const audioContextRef = useRef<AudioContext | null>(null);
+
+    const resetState = () => {
+        setCaption('');
+        setError(null);
+        setGroundingChunks([]);
+    }
 
     const handleImageSelect = (file: File) => {
         setImageFile(file);
-        if (previewUrl) {
-            URL.revokeObjectURL(previewUrl);
-        }
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
         setPreviewUrl(URL.createObjectURL(file));
-        setCaption('');
-        setError(null);
+        resetState();
     };
     
     const handleClearImage = () => {
         setImageFile(null);
-        if (previewUrl) {
-            URL.revokeObjectURL(previewUrl);
-        }
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
         setPreviewUrl(null);
-        setCaption('');
-        setError(null);
+        resetState();
     };
 
     const handleGenerateCaption = useCallback(async () => {
@@ -239,75 +252,109 @@ const App: React.FC = () => {
             setError('Please upload an image first.');
             return;
         }
-
         setIsLoading(true);
         setIsStreaming(false);
-        setError(null);
-        setCaption('');
+        resetState();
 
         try {
-            const stream = await generateCaptionStream(imageFile);
-            setIsLoading(false);
-            setIsStreaming(true);
-            let text = '';
-            for await (const chunk of stream) {
-                text += chunk.text;
-                setCaption(text);
+            if (generationMode === 'factual') {
+                const response = await generateFactualCaption(imageFile);
+                setCaption(response.text);
+                setGroundingChunks(response.candidates?.[0]?.groundingMetadata?.groundingChunks || []);
+            } else {
+                const stream = generationMode === 'fast'
+                    ? await generateFastCaptionStream(imageFile)
+                    : await generateDeepCaptionStream(imageFile);
+                
+                setIsLoading(false);
+                setIsStreaming(true);
+                let text = '';
+                for await (const chunk of stream) {
+                    text += chunk.text;
+                    setCaption(text);
+                }
             }
         } catch (e: unknown) {
-            let originalError: Error;
-            if (e instanceof Error) {
-                originalError = e;
-            } else {
-                originalError = new Error('An unknown error occurred.');
-            }
-            // Use AI to analyze and explain the error
+            const originalError = e instanceof Error ? e : new Error('An unknown error occurred.');
             const analyzedError = await analyzeError(originalError);
             setError(analyzedError);
-
         } finally {
             setIsLoading(false);
             setIsStreaming(false);
         }
-    }, [imageFile]);
+    }, [imageFile, generationMode]);
+
+    const handleTextToSpeech = useCallback(async () => {
+        if (!caption) return;
+        setIsAudioLoading(true);
+        try {
+            if (!audioContextRef.current) {
+                audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+            }
+            const audioContext = audioContextRef.current;
+
+            const base64Audio = await generateSpeech(caption);
+            const audioBuffer = await decodeAudioData(decode(base64Audio), audioContext, 24000, 1);
+            
+            const source = audioContext.createBufferSource();
+            source.buffer = audioBuffer;
+            source.connect(audioContext.destination);
+            source.start();
+        } catch (e: unknown) {
+             const originalError = e instanceof Error ? e : new Error('An unknown error occurred during audio generation.');
+             const analyzedError = await analyzeError(originalError);
+             setError(analyzedError);
+        } finally {
+            setIsAudioLoading(false);
+        }
+    }, [caption]);
+
+    const isButtonDisabled = !imageFile || isLoading || isStreaming;
 
     return (
         <div className="min-h-screen bg-base text-text-primary font-sans flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
             <main className="w-full max-w-2xl mx-auto">
                 <div className="bg-surface rounded-3xl shadow-2xl shadow-pink-200/50 p-6 sm:p-10">
                     <header className="text-center mb-8">
-                        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-primary">
-                            AI Image Captioner
-                        </h1>
-                        <p className="mt-2 text-md text-text-secondary">
-                            Let Gemini bring your images to life with a story.
-                        </p>
+                        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-primary">AI Image Companion</h1>
+                        <p className="mt-2 text-md text-text-secondary">Let Gemini bring your images to life.</p>
                     </header>
 
                     <div className="space-y-6">
-                        <ImageUploader 
-                            onImageSelect={handleImageSelect}
-                            onClearImage={handleClearImage}
-                            previewUrl={previewUrl}
-                            isLoading={isLoading || isStreaming} 
-                        />
-
-                        <button
-                            onClick={handleGenerateCaption}
-                            disabled={!imageFile || isLoading || isStreaming}
-                            className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-lg font-medium text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-hover disabled:bg-pink-300 disabled:cursor-not-allowed transition-colors duration-300"
-                        >
-                            {isLoading ? 'Preparing...' : isStreaming ? 'Generating...' : 'Generate Caption'}
+                        <ImageUploader onImageSelect={handleImageSelect} onClearImage={handleClearImage} previewUrl={previewUrl} isLoading={isLoading || isStreaming} />
+                        <ModeSelector selectedMode={generationMode} onModeChange={setGenerationMode} disabled={isLoading || isStreaming} />
+                        
+                        <button onClick={handleGenerateCaption} disabled={isButtonDisabled} className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-lg font-medium text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-hover disabled:bg-pink-300 disabled:cursor-not-allowed transition-colors duration-300">
+                            {isLoading ? 'Preparing...' : isStreaming ? 'Generating...' : 'Generate'}
                         </button>
 
                         {(isLoading || caption || error) && (
-                            <div className="bg-pink-50 rounded-2xl p-6 min-h-[100px] flex items-center justify-center">
+                            <div className="bg-pink-50 rounded-2xl p-6 min-h-[100px] flex flex-col items-center justify-center">
                                 {isLoading && <LoadingSpinner />}
                                 {error && <p className="text-center text-red-600 leading-relaxed">{error}</p>}
                                 {caption && !error && (
-                                    <p className="text-text-secondary text-center text-lg leading-relaxed">
-                                        {caption}
-                                    </p>
+                                    <div className="w-full">
+                                        <div className="flex justify-center items-start gap-3">
+                                            <p className="flex-1 text-text-secondary text-center text-lg leading-relaxed">{caption}</p>
+                                             <button onClick={handleTextToSpeech} disabled={isAudioLoading} className="text-primary hover:text-primary-hover disabled:text-gray-400 disabled:cursor-not-allowed" aria-label="Read caption aloud">
+                                                {isAudioLoading ? <LoadingAudioSpinner /> : <PlayIcon />}
+                                            </button>
+                                        </div>
+                                        {groundingChunks.length > 0 && (
+                                            <div className="mt-4 pt-4 border-t border-pink-200">
+                                                <h4 className="text-sm font-semibold text-center text-gray-500 mb-2">Sources:</h4>
+                                                <ul className="text-center space-y-1">
+                                                    {groundingChunks.map((chunk, index) => (
+                                                        <li key={index}>
+                                                          <a href={chunk.web.uri} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                                                            {chunk.web.title || 'Link'}
+                                                          </a>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         )}
