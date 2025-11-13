@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { generateCaption } from './services/geminiService';
+import { generateCaptionStream, analyzeError } from './services/geminiService';
 
 const UploadIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -211,6 +211,7 @@ const App: React.FC = () => {
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [caption, setCaption] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isStreaming, setIsStreaming] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
     const handleImageSelect = (file: File) => {
@@ -240,20 +241,33 @@ const App: React.FC = () => {
         }
 
         setIsLoading(true);
+        setIsStreaming(false);
         setError(null);
         setCaption('');
 
         try {
-            const result = await generateCaption(imageFile);
-            setCaption(result);
-        } catch (e: unknown) {
-            if (e instanceof Error) {
-                setError(e.message);
-            } else {
-                setError('An unknown error occurred.');
+            const stream = await generateCaptionStream(imageFile);
+            setIsLoading(false);
+            setIsStreaming(true);
+            let text = '';
+            for await (const chunk of stream) {
+                text += chunk.text;
+                setCaption(text);
             }
+        } catch (e: unknown) {
+            let originalError: Error;
+            if (e instanceof Error) {
+                originalError = e;
+            } else {
+                originalError = new Error('An unknown error occurred.');
+            }
+            // Use AI to analyze and explain the error
+            const analyzedError = await analyzeError(originalError);
+            setError(analyzedError);
+
         } finally {
             setIsLoading(false);
+            setIsStreaming(false);
         }
     }, [imageFile]);
 
@@ -275,22 +289,22 @@ const App: React.FC = () => {
                             onImageSelect={handleImageSelect}
                             onClearImage={handleClearImage}
                             previewUrl={previewUrl}
-                            isLoading={isLoading} 
+                            isLoading={isLoading || isStreaming} 
                         />
 
                         <button
                             onClick={handleGenerateCaption}
-                            disabled={!imageFile || isLoading}
+                            disabled={!imageFile || isLoading || isStreaming}
                             className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-lg font-medium text-white bg-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-hover disabled:bg-pink-300 disabled:cursor-not-allowed transition-colors duration-300"
                         >
-                            {isLoading ? 'Generating...' : 'Generate Caption'}
+                            {isLoading ? 'Preparing...' : isStreaming ? 'Generating...' : 'Generate Caption'}
                         </button>
 
                         {(isLoading || caption || error) && (
                             <div className="bg-pink-50 rounded-2xl p-6 min-h-[100px] flex items-center justify-center">
                                 {isLoading && <LoadingSpinner />}
-                                {error && <p className="text-center text-red-600">{error}</p>}
-                                {caption && !isLoading && (
+                                {error && <p className="text-center text-red-600 leading-relaxed">{error}</p>}
+                                {caption && !error && (
                                     <p className="text-text-secondary text-center text-lg leading-relaxed">
                                         {caption}
                                     </p>
