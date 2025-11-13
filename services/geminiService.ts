@@ -14,17 +14,13 @@ const fileToGenerativePart = async (file: File) => {
 };
 
 export const generateCaption = async (imageFile: File): Promise<string> => {
-    if (!process.env.API_KEY) {
-        throw new Error("API_KEY environment variable is not set.");
-    }
-
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const imagePart = await fileToGenerativePart(imageFile);
         
         const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
-          contents: [{ parts: [imagePart, { text: "Describe this image in a creative and engaging way. What is happening? What emotions does it evoke?" }] }],
+          contents: { parts: [imagePart, { text: "Describe this image in a creative and engaging way. What is happening? What emotions does it evoke?" }] },
         });
 
         return response.text;
